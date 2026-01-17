@@ -1,0 +1,692 @@
+--CLAUDE HUB
+
+local library = {flags = {}, windows = {}, open = true}
+
+local runService = game:GetService("RunService")
+local tweenService = game:GetService("TweenService")
+local textService = game:GetService("TextService")
+local inputService = game:GetService("UserInputService")
+local ui = Enum.UserInputType.MouseButton1
+
+local dragging, dragInput, dragStart, startPos, dragObject
+
+local function round(num, bracket)
+	bracket = bracket or 1
+	local a = math.floor(num/bracket + (math.sign(num) * 0.5)) * bracket
+	return a < 0 and a + bracket or a
+end
+
+local function keyCheck(x, x1)
+	for _, v in next, x1 do
+		if v == x then return true end
+	end
+end
+
+local function update(input)
+	local delta = input.Position - dragStart
+	local yPos = math.max((startPos.Y.Offset + delta.Y), -36)
+	dragObject:TweenPosition(UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, yPos), "Out", "Quint", 0.12, true)
+end
+
+local chromaColor
+local rainbowTime = 3.5
+spawn(function()
+	while wait() do
+		chromaColor = Color3.fromHSV(tick() % rainbowTime / rainbowTime, 0.95, 1)
+	end
+end)
+
+function library:Create(class, properties)
+	properties = typeof(properties) == "table" and properties or {}
+	local inst = Instance.new(class)
+	for property, value in next, properties do
+		inst[property] = value
+	end
+	return inst
+end
+
+local function createOptionHolder(holderTitle, parent, parentTable, subHolder)
+	local size = subHolder and 38 or 44
+	
+	parentTable.main = library:Create("Frame", {
+		LayoutOrder = subHolder and parentTable.position or 0,
+		Position = UDim2.new(0, 20 + (270 * (parentTable.position or 0)), 0, 20),
+		Size = UDim2.new(0, 260, 0, size),
+		BackgroundColor3 = Color3.fromRGB(18, 18, 20),
+		BorderSizePixel = 0,
+		ClipsDescendants = true,
+		Parent = parent
+	})
+	
+	library:Create("UICorner", {
+		CornerRadius = UDim.new(0, 8),
+		Parent = parentTable.main
+	})
+	
+	library:Create("UIStroke", {
+		Color = Color3.fromRGB(35, 35, 40),
+		Thickness = 1.5,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		Parent = parentTable.main
+	})
+	
+	local titleButton = library:Create("TextButton", {
+		Size = UDim2.new(1, 0, 0, size),
+		BackgroundColor3 = subHolder and Color3.fromRGB(22, 22, 25) or Color3.fromRGB(18, 18, 20),
+		BorderSizePixel = 0,
+		Text = "",
+		AutoButtonColor = false,
+		Parent = parentTable.main
+	})
+	
+	library:Create("UICorner", {
+		CornerRadius = UDim.new(0, 8),
+		Parent = titleButton
+	})
+	
+	local title = library:Create("TextLabel", {
+		Size = UDim2.new(1, -50, 1, 0),
+		Position = UDim2.new(0, 16, 0, 0),
+		BackgroundTransparency = 1,
+		Text = holderTitle,
+		TextSize = 17,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Color3.fromRGB(240, 240, 245),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = titleButton
+	})
+	
+	local arrow = library:Create("ImageLabel", {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -16, 0.5, 0),
+		Size = UDim2.new(0, 18, 0, 18),
+		BackgroundTransparency = 1,
+		Image = "rbxassetid://4918373417",
+		ImageColor3 = Color3.fromRGB(120, 120, 130),
+		Rotation = parentTable.open and 90 or 0,
+		Parent = titleButton
+	})
+	
+	parentTable.content = library:Create("Frame", {
+		Position = UDim2.new(0, 0, 0, size),
+		Size = UDim2.new(1, 0, 1, -size),
+		BackgroundTransparency = 1,
+		Parent = parentTable.main
+	})
+	
+	local layout = library:Create("UIListLayout", {
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 3),
+		Parent = parentTable.content
+	})
+	
+	library:Create("UIPadding", {
+		PaddingTop = UDim.new(0, 6),
+		PaddingBottom = UDim.new(0, 6),
+		PaddingLeft = UDim.new(0, 8),
+		PaddingRight = UDim.new(0, 8),
+		Parent = parentTable.content
+	})
+	
+	layout.Changed:connect(function()
+		parentTable.content.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y)
+		local newSize = #parentTable.options > 0 and parentTable.open and 
+			UDim2.new(0, 260, 0, layout.AbsoluteContentSize.Y + size + 12) or 
+			UDim2.new(0, 260, 0, size)
+		parentTable.main.Size = newSize
+	end)
+	
+	if not subHolder then
+		titleButton.InputBegan:connect(function(input)
+			if input.UserInputType == ui or input.UserInputType == Enum.UserInputType.Touch then
+				dragObject = parentTable.main
+				dragging = true
+				dragStart = input.Position
+				startPos = dragObject.Position
+			end
+		end)
+		
+		titleButton.InputChanged:connect(function(input)
+			if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+				dragInput = input
+			end
+		end)
+		
+		titleButton.InputEnded:connect(function(input)
+			if input.UserInputType == ui or input.UserInputType == Enum.UserInputType.Touch then
+				dragging = false
+			end
+		end)
+	end
+	
+	titleButton.MouseButton1Click:connect(function()
+		parentTable.open = not parentTable.open
+		
+		tweenService:Create(arrow, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			Rotation = parentTable.open and 90 or 0,
+			ImageColor3 = parentTable.open and Color3.fromRGB(150, 150, 160) or Color3.fromRGB(120, 120, 130)
+		}):Play()
+		
+		if subHolder then
+			tweenService:Create(titleButton, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+				BackgroundColor3 = parentTable.open and Color3.fromRGB(26, 26, 30) or Color3.fromRGB(22, 22, 25)
+			}):Play()
+		end
+		
+		local newSize = #parentTable.options > 0 and parentTable.open and 
+			UDim2.new(0, 260, 0, layout.AbsoluteContentSize.Y + size + 12) or 
+			UDim2.new(0, 260, 0, size)
+			
+		parentTable.main:TweenSize(newSize, "Out", "Quart", 0.3, true)
+	end)
+	
+	function parentTable:SetTitle(newTitle)
+		title.Text = tostring(newTitle)
+	end
+	
+	return parentTable
+end
+
+local function createLabel(option, parent)
+	local main = library:Create("TextLabel", {
+		LayoutOrder = option.position,
+		Size = UDim2.new(1, 0, 0, 26),
+		BackgroundTransparency = 1,
+		Text = option.text,
+		TextSize = 15,
+		Font = Enum.Font.GothamMedium,
+		TextColor3 = Color3.fromRGB(180, 180, 190),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = parent.content
+	})
+	
+	setmetatable(option, {__newindex = function(t, i, v)
+		if i == "Text" then
+			main.Text = tostring(v)
+		end
+	end})
+end
+
+local function createToggle(option, parent)
+	local main = library:Create("Frame", {
+		LayoutOrder = option.position,
+		Size = UDim2.new(1, 0, 0, 36),
+		BackgroundColor3 = Color3.fromRGB(24, 24, 28),
+		BorderSizePixel = 0,
+		Parent = parent.content
+	})
+	
+	library:Create("UICorner", {
+		CornerRadius = UDim.new(0, 6),
+		Parent = main
+	})
+	
+	local button = library:Create("TextButton", {
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		Text = "",
+		Parent = main
+	})
+	
+	local label = library:Create("TextLabel", {
+		Position = UDim2.new(0, 12, 0, 0),
+		Size = UDim2.new(1, -60, 1, 0),
+		BackgroundTransparency = 1,
+		Text = option.text,
+		TextSize = 15,
+		Font = Enum.Font.GothamSemibold,
+		TextColor3 = Color3.fromRGB(220, 220, 230),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = main
+	})
+	
+	local toggleBg = library:Create("Frame", {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -12, 0.5, 0),
+		Size = UDim2.new(0, 42, 0, 22),
+		BackgroundColor3 = option.state and Color3.fromRGB(70, 160, 255) or Color3.fromRGB(40, 40, 45),
+		BorderSizePixel = 0,
+		Parent = main
+	})
+	
+	library:Create("UICorner", {
+		CornerRadius = UDim.new(1, 0),
+		Parent = toggleBg
+	})
+	
+	local toggleCircle = library:Create("Frame", {
+		Position = option.state and UDim2.new(1, -20, 0.5, 0) or UDim2.new(0, 2, 0.5, 0),
+		Size = UDim2.new(0, 18, 0, 18),
+		AnchorPoint = Vector2.new(0, 0.5),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BorderSizePixel = 0,
+		Parent = toggleBg
+	})
+	
+	library:Create("UICorner", {
+		CornerRadius = UDim.new(1, 0),
+		Parent = toggleCircle
+	})
+	
+	local inContact = false
+	
+	button.MouseEnter:connect(function()
+		inContact = true
+		tweenService:Create(main, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+		}):Play()
+	end)
+	
+	button.MouseLeave:connect(function()
+		inContact = false
+		tweenService:Create(main, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+		}):Play()
+	end)
+	
+	button.MouseButton1Click:connect(function()
+		option:SetState(not option.state)
+	end)
+	
+	function option:SetState(state)
+		library.flags[self.flag] = state
+		self.state = state
+		
+		tweenService:Create(toggleCircle, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			Position = state and UDim2.new(1, -20, 0.5, 0) or UDim2.new(0, 2, 0.5, 0)
+		}):Play()
+		
+		tweenService:Create(toggleBg, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			BackgroundColor3 = state and Color3.fromRGB(70, 160, 255) or Color3.fromRGB(40, 40, 45)
+		}):Play()
+		
+		self.callback(state)
+	end
+	
+	if option.state then
+		delay(1, function() option.callback(true) end)
+	end
+	
+	setmetatable(option, {__newindex = function(t, i, v)
+		if i == "Text" then
+			label.Text = tostring(v)
+		end
+	end})
+end
+
+local function createButton(option, parent)
+	local main = library:Create("Frame", {
+		LayoutOrder = option.position,
+		Size = UDim2.new(1, 0, 0, 38),
+		BackgroundColor3 = Color3.fromRGB(70, 160, 255),
+		BorderSizePixel = 0,
+		Parent = parent.content
+	})
+	
+	library:Create("UICorner", {
+		CornerRadius = UDim.new(0, 6),
+		Parent = main
+	})
+	
+	library:Create("UIGradient", {
+		Color = ColorSequence.new{
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(70, 160, 255)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 140, 235))
+		},
+		Rotation = 45,
+		Parent = main
+	})
+	
+	local button = library:Create("TextButton", {
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		Text = option.text,
+		TextSize = 15,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		Parent = main
+	})
+	
+	button.MouseEnter:connect(function()
+		tweenService:Create(main, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			BackgroundColor3 = Color3.fromRGB(80, 170, 255)
+		}):Play()
+	end)
+	
+	button.MouseLeave:connect(function()
+		tweenService:Create(main, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			BackgroundColor3 = Color3.fromRGB(70, 160, 255)
+		}):Play()
+	end)
+	
+	button.MouseButton1Click:connect(function()
+		library.flags[option.flag] = true
+		
+		tweenService:Create(main, TweenInfo.new(0.1, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			Size = UDim2.new(1, -4, 1, -4)
+		}):Play()
+		
+		wait(0.1)
+		
+		tweenService:Create(main, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			Size = UDim2.new(1, 0, 1, 0)
+		}):Play()
+		
+		option.callback()
+	end)
+end
+
+local function createSlider(option, parent)
+	local main = library:Create("Frame", {
+		LayoutOrder = option.position,
+		Size = UDim2.new(1, 0, 0, 54),
+		BackgroundColor3 = Color3.fromRGB(24, 24, 28),
+		BorderSizePixel = 0,
+		Parent = parent.content
+	})
+	
+	library:Create("UICorner", {
+		CornerRadius = UDim.new(0, 6),
+		Parent = main
+	})
+	
+	local title = library:Create("TextLabel", {
+		Position = UDim2.new(0, 12, 0, 6),
+		Size = UDim2.new(1, -70, 0, 18),
+		BackgroundTransparency = 1,
+		Text = option.text,
+		TextSize = 15,
+		Font = Enum.Font.GothamSemibold,
+		TextColor3 = Color3.fromRGB(220, 220, 230),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = main
+	})
+	
+	local valueLabel = library:Create("TextLabel", {
+		Position = UDim2.new(1, -60, 0, 6),
+		Size = UDim2.new(0, 48, 0, 18),
+		BackgroundColor3 = Color3.fromRGB(18, 18, 22),
+		Text = tostring(option.value),
+		TextSize = 14,
+		Font = Enum.Font.GothamSemibold,
+		TextColor3 = Color3.fromRGB(180, 180, 190),
+		Parent = main
+	})
+	
+	library:Create("UICorner", {
+		CornerRadius = UDim.new(0, 4),
+		Parent = valueLabel
+	})
+	
+	local sliderBg = library:Create("Frame", {
+		Position = UDim2.new(0, 12, 0, 32),
+		Size = UDim2.new(1, -24, 0, 14),
+		BackgroundColor3 = Color3.fromRGB(35, 35, 40),
+		BorderSizePixel = 0,
+		Parent = main
+	})
+	
+	library:Create("UICorner", {
+		CornerRadius = UDim.new(1, 0),
+		Parent = sliderBg
+	})
+	
+	local sliderFill = library:Create("Frame", {
+		Size = UDim2.new((option.value - option.min) / (option.max - option.min), 0, 1, 0),
+		BackgroundColor3 = Color3.fromRGB(70, 160, 255),
+		BorderSizePixel = 0,
+		Parent = sliderBg
+	})
+	
+	library:Create("UICorner", {
+		CornerRadius = UDim.new(1, 0),
+		Parent = sliderFill
+	})
+	
+	library:Create("UIGradient", {
+		Color = ColorSequence.new{
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(70, 160, 255)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 140, 235))
+		},
+		Parent = sliderFill
+	})
+	
+	local sliderButton = library:Create("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new((option.value - option.min) / (option.max - option.min), 0, 0.5, 0),
+		Size = UDim2.new(0, 20, 0, 20),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BorderSizePixel = 0,
+		Parent = sliderBg
+	})
+	
+	library:Create("UICorner", {
+		CornerRadius = UDim.new(1, 0),
+		Parent = sliderButton
+	})
+	
+	library:Create("UIStroke", {
+		Color = Color3.fromRGB(70, 160, 255),
+		Thickness = 3,
+		Parent = sliderButton
+	})
+	
+	local sliding = false
+	local inContact = false
+	
+	sliderBg.InputBegan:connect(function(input)
+		if input.UserInputType == ui or input.UserInputType == Enum.UserInputType.Touch then
+			sliding = true
+			local value = option.min + ((input.Position.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X) * (option.max - option.min)
+			option:SetValue(value)
+			
+			tweenService:Create(sliderButton, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+				Size = UDim2.new(0, 24, 0, 24)
+			}):Play()
+		end
+		
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			inContact = true
+			if not sliding then
+				tweenService:Create(sliderButton, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+					Size = UDim2.new(0, 22, 0, 22)
+				}):Play()
+			end
+		end
+	end)
+	
+	inputService.InputChanged:connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement and sliding then
+			local value = option.min + ((input.Position.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X) * (option.max - option.min)
+			option:SetValue(value)
+		end
+	end)
+	
+	sliderBg.InputEnded:connect(function(input)
+		if input.UserInputType == ui or input.UserInputType == Enum.UserInputType.Touch then
+			sliding = false
+			tweenService:Create(sliderButton, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+				Size = inContact and UDim2.new(0, 22, 0, 22) or UDim2.new(0, 20, 0, 20)
+			}):Play()
+		end
+		
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			inContact = false
+			if not sliding then
+				tweenService:Create(sliderButton, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+					Size = UDim2.new(0, 20, 0, 20)
+				}):Play()
+			end
+		end
+	end)
+	
+	function option:SetValue(value)
+		value = round(value, self.float)
+		value = math.clamp(value, self.min, self.max)
+		
+		local percent = (value - self.min) / (self.max - self.min)
+		
+		tweenService:Create(sliderFill, TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			Size = UDim2.new(percent, 0, 1, 0)
+		}):Play()
+		
+		tweenService:Create(sliderButton, TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			Position = UDim2.new(percent, 0, 0.5, 0)
+		}):Play()
+		
+		library.flags[self.flag] = value
+		self.value = value
+		valueLabel.Text = tostring(value)
+		self.callback(value)
+	end
+end
+
+local function loadOptions(option, holder)
+	for _, newOption in next, option.options do
+		if newOption.type == "label" then
+			createLabel(newOption, option)
+		elseif newOption.type == "toggle" then
+			createToggle(newOption, option)
+		elseif newOption.type == "button" then
+			createButton(newOption, option)
+		elseif newOption.type == "slider" then
+			createSlider(newOption, option)
+		elseif newOption.type == "folder" then
+			newOption:init()
+		end
+	end
+end
+
+local function getFunctions(parent)
+	function parent:AddLabel(option)
+		option = typeof(option) == "table" and option or {}
+		option.text = tostring(option.text)
+		option.type = "label"
+		option.position = #self.options
+		table.insert(self.options, option)
+		return option
+	end
+	
+	function parent:AddToggle(option)
+		option = typeof(option) == "table" and option or {}
+		option.text = tostring(option.text)
+		option.state = typeof(option.state) == "boolean" and option.state or false
+		option.callback = typeof(option.callback) == "function" and option.callback or function() end
+		option.type = "toggle"
+		option.position = #self.options
+		option.flag = option.flag or option.text
+		library.flags[option.flag] = option.state
+		table.insert(self.options, option)
+		return option
+	end
+	
+	function parent:AddButton(option)
+		option = typeof(option) == "table" and option or {}
+		option.text = tostring(option.text)
+		option.callback = typeof(option.callback) == "function" and option.callback or function() end
+		option.type = "button"
+		option.position = #self.options
+		option.flag = option.flag or option.text
+		table.insert(self.options, option)
+		return option
+	end
+	
+	function parent:AddSlider(option)
+		option = typeof(option) == "table" and option or {}
+		option.text = tostring(option.text)
+		option.min = typeof(option.min) == "number" and option.min or 0
+		option.max = typeof(option.max) == "number" and option.max or 100
+		option.value = math.clamp(typeof(option.value) == "number" and option.value or option.min, option.min, option.max)
+		option.callback = typeof(option.callback) == "function" and option.callback or function() end
+		option.float = typeof(option.float) == "number" and option.float or 1
+		option.type = "slider"
+		option.position = #self.options
+		option.flag = option.flag or option.text
+		library.flags[option.flag] = option.value
+		table.insert(self.options, option)
+		return option
+	end
+	
+	function parent:AddFolder(title)
+		local option = {}
+		option.title = tostring(title)
+		option.options = {}
+		option.open = false
+		option.type = "folder"
+		option.position = #self.options
+		table.insert(self.options, option)
+		
+		getFunctions(option)
+		
+		function option:init()
+			createOptionHolder(self.title, parent.content, self, true)
+			loadOptions(self, parent)
+		end
+		
+		return option
+	end
+end
+
+function library:CreateWindow(title)
+	local window = {
+		title = tostring(title), 
+		options = {}, 
+		open = true, 
+		canInit = true, 
+		init = false, 
+		position = #self.windows
+	}
+	getFunctions(window)
+	table.insert(library.windows, window)
+	return window
+end
+
+function library:Init()
+	self.base = self.base or self:Create("ScreenGui", {
+		ResetOnSpawn = false,
+		Name = "ClaudeHubUI"
+	})
+	
+	if syn and syn.protect_gui then
+		syn.protect_gui(self.base)
+	elseif gethui then
+		self.base.Parent = gethui()
+	else
+		self.base.Parent = game:GetService("CoreGui")
+	end
+	
+	for _, window in next, self.windows do
+		if window.canInit and not window.init then
+			window.init = true
+			createOptionHolder(window.title, self.base, window)
+			loadOptions(window)
+		end
+	end
+	
+	return self.base
+end
+
+function library:Close()
+	if typeof(self.base) ~= "Instance" then return end
+	self.open = not self.open
+	for _, window in next, self.windows do
+		if window.main then
+			window.main.Visible = self.open
+		end
+	end
+end
+
+inputService.InputChanged:connect(function(input)
+	if input == dragInput and dragging then
+		update(input)
+	end
+end)
+
+wait(1)
+local VirtualUser = game:service("VirtualUser")
+game:service("Players").LocalPlayer.Idled:connect(function()
+	VirtualUser:CaptureController()
+	VirtualUser:ClickButton2(Vector2.new())
+end)
+
+return library
